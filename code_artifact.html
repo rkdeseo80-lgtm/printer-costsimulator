@@ -1,0 +1,697 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>EPSON × Canon × Brother 印刷コストシミュレーター</title>
+  <style>
+    :root {
+      --blue: #1769aa;
+      --blue2: #0d4f86;
+      --pale: #eef6fc;
+      --yellow: #fff4c7;
+      --line: #d9e2ea;
+      --text: #17212b;
+      --muted: #66727e;
+      --green: #16784a;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Yu Gothic", Meiryo, sans-serif;
+      background: #f5f7f9;
+      color: var(--text);
+    }
+    header {
+      background: linear-gradient(135deg, var(--blue2), var(--blue));
+      color: #fff;
+      padding: 24px 18px;
+    }
+    header h1 {
+      max-width: 1100px;
+      margin: 0 auto 5px;
+      font-size: clamp(22px, 4vw, 34px);
+    }
+    header p {
+      max-width: 1100px;
+      margin: auto;
+      opacity: .9;
+    }
+    main {
+      max-width: 1100px;
+      margin: 22px auto;
+      padding: 0 14px 40px;
+    }
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+    button {
+      border: 0;
+      border-radius: 9px;
+      padding: 11px 16px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .tab {
+      background: #e6ebef;
+    }
+    .tab.active {
+      background: var(--blue);
+      color: #fff;
+    }
+    .panel {
+      display: none;
+    }
+    .panel.active {
+      display: block;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 18px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 8px #00000008;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .three {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    select, input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #cbd5df;
+      border-radius: 9px;
+      font-size: 16px;
+      background: #fff;
+    }
+    .input {
+      background: var(--yellow);
+    }
+    .results {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .metric {
+      background: var(--pale);
+      padding: 14px;
+      border-radius: 11px;
+    }
+    .metric b {
+      display: block;
+      font-size: 20px;
+      margin-top: 5px;
+      color: var(--blue2);
+    }
+    .metric span {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    h2 {
+      margin: 0 0 15px;
+    }
+    .compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .machine {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px;
+    }
+    .winner {
+      border: 2px solid var(--green);
+      background: #f1fbf6;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+    }
+    th {
+      background: var(--pale);
+    }
+    canvas {
+      width: 100%;
+      height: 300px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+    }
+    .note {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #e9f4ff;
+      color: var(--blue2);
+      font-size: 12px;
+    }
+    @media (max-width: 760px) {
+      .grid, .three, .compare, .results {
+        grid-template-columns: 1fr;
+      }
+      .results {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>EPSON × Canon × Brother 印刷コストシミュレーター</h1>
+    <p>月間印刷枚数から、インクコスト・年間コスト・長期トータルコストを比較</p>
+  </header>
+  <main>
+    <div class="tabs">
+      <button class="tab active" data-tab="single">1機種シミュレーション</button>
+      <button class="tab" data-tab="compare">2機種比較</button>
+      <button class="tab" data-tab="budget">枚数別コスト早見表</button>
+      <button class="tab" data-tab="ranking">複数機種ランキング</button>
+      <button class="tab" data-tab="master">機種マスター</button>
+    </div>
+
+    <!-- 1機種シミュレーション -->
+    <section id="single" class="panel active">
+      <div class="card">
+        <h2>印刷条件</h2>
+        <div class="grid">
+          <div>
+            <label>プリンター</label>
+            <select id="printer" class="input"></select>
+            <div class="note" style="margin-top:7px"><b>対応インク：</b><span id="singleInk"></span></div>
+          </div>
+          <div>
+            <label>本体価格（税込・任意）</label>
+            <input id="price" class="input" type="number" min="0" placeholder="未入力でも計算可能">
+          </div>
+          <div>
+            <label>一緒に購入する予備インク代（税込）</label>
+            <input id="extraInk" class="input" type="number" min="0" value="0" placeholder="例：6980">
+          </div>
+          <div>
+            <label>月間モノクロ枚数</label>
+            <input id="mono" class="input" type="number" min="0" value="200">
+          </div>
+          <div>
+            <label>月間カラー枚数</label>
+            <input id="color" class="input" type="number" min="0" value="100">
+          </div>
+          <div>
+            <label>使用年数</label>
+            <input id="years" class="input" type="number" min="1" value="5">
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>計算結果</h2>
+        <div class="results" id="singleResults"></div>
+      </div>
+    </section>
+
+    <!-- 2機種比較 -->
+    <section id="compare" class="panel">
+      <div class="card">
+        <h2>比較条件</h2>
+        <div class="grid">
+          <div><label>機種A</label><select id="pa" class="input"></select></div>
+          <div><label>機種B</label><select id="pb" class="input"></select></div>
+          <div><label>機種A 本体価格（税込）</label><input id="pAprice" class="input" type="number" min="0"></div>
+          <div><label>機種B 本体価格（税込）</label><input id="pBprice" class="input" type="number" min="0"></div>
+          <div><label>機種A 一緒に購入する予備インク代</label><input id="pAink" class="input" type="number" min="0" value="0"></div>
+          <div><label>機種B 一緒に購入する予備インク代</label><input id="pBink" class="input" type="number" min="0" value="0"></div>
+          <div><label>月間モノクロ枚数</label><input id="cmono" class="input" type="number" min="0" value="200"></div>
+          <div><label>月間カラー枚数</label><input id="ccolor" class="input" type="number" min="0" value="100"></div>
+          <div><label>比較年数</label><input id="cyears" class="input" type="number" min="1" value="5"></div>
+        </div>
+      </div>
+      <div class="compare">
+        <div class="machine" id="resA"></div>
+        <div class="machine" id="resB"></div>
+      </div>
+      <div class="card">
+        <h2>累積トータルコスト</h2>
+        <canvas id="chart" width="1000" height="300"></canvas>
+        <p class="note" id="diff"></p>
+      </div>
+    </section>
+
+    <!-- 枚数別コスト早見表 -->
+    <section id="budget" class="panel">
+      <div class="card">
+        <h2>枚数別コスト早見表</h2>
+        <p class="note">販売時に「結局、何枚刷るといくら？」をすぐ見せるための画面です。本体価格・同時購入インク代も含められます。</p>
+        <div class="grid">
+          <div><label>プリンター</label><select id="bprinter" class="input"></select></div>
+          <div><label>本体価格（税込）</label><input id="bprice" class="input" type="number" min="0" placeholder="例：19800"></div>
+          <div><label>一緒に購入する予備インク代（税込）</label><input id="bextra" class="input" type="number" min="0" value="0"></div>
+          <div><label>カラー印刷の割合（%）</label><input id="bcolorRate" class="input" type="number" min="0" max="100" value="50"></div>
+          <div><label>付属インクで印刷できる想定枚数</label><input id="bstarter" class="input" type="number" min="0" value="0" placeholder="不明なら0"></div>
+          <div><label>任意の予定印刷枚数</label><input id="bcustom" class="input" type="number" min="0" value="1000"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>総コスト比較</h2>
+        <div style="overflow:auto">
+          <table>
+            <thead>
+              <tr>
+                <th>印刷枚数</th>
+                <th>モノクロ</th>
+                <th>カラー</th>
+                <th>追加インク相当額</th>
+                <th>購入時費用</th>
+                <th>累計総額</th>
+                <th>1枚あたり総額</th>
+              </tr>
+            </thead>
+            <tbody id="budgetRows"></tbody>
+          </table>
+        </div>
+        <p class="note" id="budgetNote"></p>
+      </div>
+    </section>
+
+    <!-- 複数機種ランキング -->
+    <section id="ranking" class="panel">
+      <div class="card">
+        <h2>複数機種ランキング</h2>
+        <p class="note">候補機種にチェックを入れると、同じ印刷条件で500・1,000・3,000・5,000枚時点の総コストを比較します。本体価格は下の欄で機種ごとに変更できます。</p>
+        <div class="grid">
+          <div><label>カラー印刷の割合（%）</label><input id="rColorRate" class="input" type="number" min="0" max="100" value="50"></div>
+          <div><label>付属インク想定枚数（全機種共通）</label><input id="rStarter" class="input" type="number" min="0" value="0"></div>
+          <div><label>一緒に購入する予備インク代（全機種共通）</label><input id="rExtra" class="input" type="number" min="0" value="0"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>比較する機種</h2>
+        <div id="rankChoices" class="grid"></div>
+      </div>
+      <div class="card">
+        <h2>総コストランキング</h2>
+        <div style="overflow:auto">
+          <table>
+            <thead>
+              <tr>
+                <th>順位</th>
+                <th>機種</th>
+                <th>500枚</th>
+                <th>1,000枚</th>
+                <th>3,000枚</th>
+                <th>5,000枚</th>
+                <th>5,000枚時の1位との差</th>
+              </tr>
+            </thead>
+            <tbody id="rankRows"></tbody>
+          </table>
+        </div>
+        <p class="note" id="rankNote"></p>
+      </div>
+    </section>
+
+    <!-- 機種マスター -->
+    <section id="master" class="panel">
+      <div class="card">
+        <h2>機種マスター</h2>
+        <div style="overflow:auto">
+          <table>
+            <thead>
+              <tr>
+                <th>メーカー</th>
+                <th>機種</th>
+                <th>対応インク</th>
+                <th>方式</th>
+                <th>状態</th>
+                <th>モノクロ</th>
+                <th>カラー</th>
+                <th>インク1セット印刷目安</th>
+                <th>参考本体価格</th>
+              </tr>
+            </thead>
+            <tbody id="masterRows"></tbody>
+          </table>
+        </div>
+        <p class="note"><b>インク1セット印刷目安</b>はメーカー公称のA4文書イールドを優先。独立インク機は色ごとの公称値が異なるため、単純な「セットで○枚」ではなく各色値または先に尽きる色を目安として表示します。<br>A4普通紙文書の印刷コスト（税込・用紙代除外）。Canonのカートリッジ機は大容量インクがある場合は大容量の公表値を採用。Brotherは公式サイト記載のA4文書インクコストを採用。対応インク型番も表示します。数値・インク情報はこのHTML内の <code>printers</code> 配列を書き換えることで更新できます。</p>
+      </div>
+    </section>
+
+    <div class="card note">
+      <b>ご利用上の注意</b><br>
+      印刷コストは各メーカー公表のA4文書コストを基準にした参考シミュレーションです。実際のインク消費量は印刷内容、クリーニング、使用環境などにより変動します。本体価格と、購入時に一緒に買う予備インク代を入力して比較できます。予備インク代は初期購入費用として総額に加算されます。枚数別早見表では付属インクの想定印刷枚数も差し引けます。メーカー公称値は規定の測定画像・測定方法による参考値で、実使用では原稿、クリーニング頻度、環境などにより変動します。
+    </div>
+  </main>
+
+  <script>
+    const printers = [
+      {maker:"EPSON", name:"EP-889A", ink:"カニ（KNIシリーズ／6色）", type:"カートリッジ", status:"2026/10/29発売予定", mono:5.1, color:14.8, price:null},
+      {maker:"EPSON", name:"EP-819A", ink:"カキゴオリ（6色）", type:"カートリッジ", status:"2026/10/29発売予定", mono:7.4, color:21.2, price:null},
+      {maker:"EPSON", name:"EP-719A", ink:"カキゴオリ（6色）", type:"カートリッジ", status:"2026/10/29発売予定", mono:7.4, color:21.2, price:null},
+      {maker:"EPSON", name:"EW-559A", ink:"IB17シリーズ（4色）", type:"カートリッジ", status:"2026/10/29発売予定", mono:5.6, color:16.2, price:null},
+      {maker:"EPSON", name:"EW-M973A3T", ink:"トビバコ（TOB-PB/MB/C/M/Y/GY）", type:"エコタンク", status:"現行", mono:0.8, color:1.9, price:null},
+      {maker:"EPSON", name:"EW-M873T", ink:"トビバコ（TOB-PB/MB/C/M/Y/GY）", type:"エコタンク", status:"現行", mono:0.8, color:1.9, price:null},
+      {maker:"EPSON", name:"EW-M757T", ink:"ケンダマ＋タケトンボ（KEN-MB / TAK-PB/C/M/Y）", type:"エコタンク", status:"現行", mono:1.6, color:3.7, price:50270},
+      {maker:"EPSON", name:"EW-M638T", ink:"ヤドカリ＋ハリネズミ（YAD-BK / HAR-C/M/Y）", type:"エコタンク", status:"現行", mono:0.4, color:1.0, price:null},
+      {maker:"EPSON", name:"EW-M678FT", ink:"ヤドカリ＋ハリネズミ（YAD-BK / HAR-C/M/Y）", type:"エコタンク", status:"現行", mono:0.4, color:1.0, price:null},
+      {maker:"EPSON", name:"EP-M476T", ink:"オハジキ（OHA-BK/C/M/Y）", type:"エコタンク", status:"現行", mono:0.3, color:0.9, price:31350},
+      {maker:"EPSON", name:"EP-M553T", ink:"タケトンボ（TAK-PB/C/M/Y）", type:"エコタンク", status:"在庫限り", mono:1.6, color:3.6, price:35750},
+      {maker:"Canon", name:"PIXUS XK510", ink:"XKI-N21 C/M/Y/BK/PB ＋ XKI-N20 PGBK", type:"カートリッジ", status:"現行", mono:1.8, color:4.3, price:null},
+      {maker:"Canon", name:"PIXUS XK140", ink:"XKI-N21 C/M/Y/BK ＋ XKI-N20 PGBK", type:"カートリッジ", status:"現行", mono:1.7, color:4.2, price:null},
+      {maker:"Canon", name:"PIXUS TS8930", yieldText:"標準: A4カラー文書 約400〜475枚目安 / 大容量: 約600〜758枚目安（各色別公称値）", ink:"BCI-331/331XL C/M/Y/BK/GY ＋ BCI-330/330XL PGBK", type:"カートリッジ", status:"現行", mono:4.6, color:13.1, price:null},
+      {maker:"Canon", name:"PIXUS TS8830", yieldText:"標準: A4カラー文書 約400〜475枚目安 / 大容量: 約600〜758枚目安（各色別公称値）", ink:"BCI-331/331XL C/M/Y/BK/GY ＋ BCI-330/330XL PGBK", type:"カートリッジ", status:"現行", mono:4.6, color:13.1, price:null},
+      {maker:"Canon", name:"PIXUS TS7630", yieldText:"標準: A4カラー文書 約400〜475枚目安 / 大容量: 約600〜765枚目安（各色別公称値）", ink:"BCI-331/331XL C/M/Y/BK ＋ BCI-330/330XL PGBK", type:"カートリッジ", status:"現行", mono:4.4, color:12.7, price:null},
+      {maker:"Canon", name:"PIXUS TS6630", yieldText:"標準: A4カラー文書 約180枚 / 大容量: 約400枚", ink:"BC-386/386XL（カラー）＋ BC-385/385XL（ブラック）", type:"カートリッジ", status:"現行", mono:9.7, color:21.3, price:null},
+      {maker:"Canon", name:"G3390", ink:"GI-31 C/M/Y/PGBK", type:"特大容量タンク", status:"現行", mono:0.5, color:1.0, price:null},
+      {maker:"Brother", name:"DCP-J529N", yieldText:"LC511 4色: 各約350ページ", ink:"LC511シリーズ（BK/C/M/Y・4色）", type:"カートリッジ", status:"現行", mono:2.9, color:11.4, price:null},
+      {maker:"Brother", name:"DCP-J929N", yieldText:"LC511 4色: 各約350ページ", ink:"LC511シリーズ（BK/C/M/Y・4色）", type:"カートリッジ", status:"現行", mono:2.9, color:11.4, price:null},
+      {maker:"Brother", name:"DCP-J1270N", yieldText:"LC514 4色: 各約1,200ページ", ink:"LC514シリーズ（BK/C/M/Y・4色）", type:"大容量インク", status:"現行", mono:1.0, color:6.1, price:null},
+      {maker:"Brother", name:"DCP-J4250N", yieldText:"LC516: 各約1,000ページ / LC516XL: 黒約6,000・カラー各約5,000ページ", ink:"LC516 / LC516XLシリーズ（BK/C/M/Y・4色）", type:"ファーストタンク", status:"現行", mono:0.8, color:4.1, price:null},
+      {maker:"Brother", name:"MFC-J4450N", yieldText:"LC516: 各約1,000ページ / LC516XL: 黒約6,000・カラー各約5,000ページ", ink:"LC516 / LC516XLシリーズ（BK/C/M/Y・4色）", type:"ファーストタンク", status:"現行", mono:0.8, color:4.1, price:null},
+      {maker:"Brother", name:"MFC-J4950DN", yieldText:"LC516: 各約1,000ページ / LC516XL: 黒約6,000・カラー各約5,000ページ", ink:"LC516 / LC516XLシリーズ（BK/C/M/Y・4色）", type:"ファーストタンク", status:"現行", mono:0.8, color:4.1, price:null},
+      {maker:"Brother", name:"DCP-J1800N", yieldText:"LC411: 黒約375枚 / C・M・Y 各約500枚", ink:"LC411シリーズ（BK/C/M/Y・4色）", type:"カートリッジ・自動カット", status:"現行", mono:3.2, color:10.4, price:null},
+      {maker:"Canon", name:"PIXUS TS5530", yieldText:"標準: A4カラー文書 約180枚 / 大容量: 約400枚", ink:"BC-395/395XL ブラック ＋ BC-386/386XL 3色カラー", type:"FINEカートリッジ", status:"現行", mono:10.5, color:22.3, price:null},
+      {maker:"Canon", name:"PIXUS TS5430", yieldText:"標準: A4カラー文書 約180枚 / 大容量: 約300枚（カラー側基準）", ink:"BC-360/360XL ブラック ＋ BC-361/361XL 3色カラー", type:"FINEカートリッジ", status:"現行", mono:null, color:21.4, price:null},
+      {maker:"Canon", name:"PIXUS TS3730", yieldText:"標準: A4カラー文書 約180枚 / 大容量: 約300枚（カラー側基準）", ink:"BC-365/365XL ブラック ＋ BC-366/366XL 3色カラー", type:"FINEカートリッジ", status:"現行", mono:8.8, color:19.5, price:null},
+      {maker:"EPSON", name:"EP-817A", yieldText:"KAK: 黒541枚 / C・M・Y・LC・LM 各191枚（各色イールド）", ink:"カキゴオリ（KAK-BK/C/M/Y/LC/LM・6色）", type:"カートリッジ", status:"2024年モデル", mono:null, color:21.2, price:null},
+      {maker:"EPSON", name:"EP-717A", yieldText:"KAK: 黒541枚 / C・M・Y・LC・LM 各191枚（各色イールド）", ink:"カキゴオリ（KAK-BK/C/M/Y/LC/LM・6色）", type:"カートリッジ", status:"2024年モデル", mono:null, color:21.2, price:null},
+      {maker:"EPSON", name:"EW-456A", yieldText:"MED: 黒860枚 / C・M・Y 各114枚（各色イールド）", ink:"メダマヤキ（MED-BK/C/M/Y・4色）", type:"カートリッジ", status:"2024年モデル", mono:null, color:16.2, price:null},
+      {maker:"EPSON", name:"EW-056A", yieldText:"MED: 黒860枚 / C・M・Y 各114枚（各色イールド）", ink:"メダマヤキ（MED-BK/C/M/Y・4色）", type:"カートリッジ", status:"2024年モデル", mono:null, color:16.2, price:null}
+    ];
+
+    const yen = n => "¥" + Math.round(n || 0).toLocaleString("ja-JP");
+    const yen1 = n => (n === null || n === undefined) ? "公式値なし" : "¥" + Number(n).toFixed(1);
+    const $ = id => document.getElementById(id);
+
+    function fillSelect(el, selected) {
+      el.innerHTML = printers.map(p => `<option value="${p.name}" ${p.name === selected ? "selected" : ""}>${p.maker}｜${p.name}</option>`).join("");
+    }
+
+    fillSelect($("printer"), "EP-889A");
+    fillSelect($("pa"), "EP-889A");
+    fillSelect($("pb"), "EW-M638T");
+    fillSelect($("bprinter"), "EP-817A");
+
+    function get(name) {
+      return printers.find(p => p.name === name);
+    }
+
+    function calc(p, mono, color, years, price, extraInk = 0) {
+      const monoCost = p.mono == null ? 0 : mono * p.mono;
+      const colorCost = p.color == null ? 0 : color * p.color;
+      const monthly = monoCost + colorCost;
+      const annual = monthly * 12;
+      const ink = annual * years;
+      const bodyPrice = Number(price) || p.price || 0;
+      const extra = Number(extraInk) || 0;
+      const initial = bodyPrice + extra;
+      const total = ink + initial;
+      const pages = (mono + color) * 12 * years;
+      return { monthly, annual, ink, total, avg: pages ? ink / pages : 0, price: bodyPrice, extraInk: extra, initial };
+    }
+
+    function metric(t, v) {
+      return `<div class="metric"><span>${t}</span><b>${v}</b></div>`;
+    }
+
+    function single() {
+      const p = get($("printer").value);
+      const m = +$("mono").value || 0;
+      const c = +$("color").value || 0;
+      const y = +$("years").value || 1;
+      const r = calc(p, m, c, y, $("price").value, $("extraInk").value);
+      
+      $("singleInk").textContent = p.ink || "—";
+      $("singleResults").innerHTML = 
+        (p.mono == null && m > 0 ? `<div class="metric" style="grid-column:1/-1;background:#fff4c7"><span>注意</span><b style="font-size:15px">この機種はメーカー公式のA4モノクロ文書コストが非公表のため、モノクロ分は総額計算に含めていません。</b></div>` : "") + 
+        metric("モノクロ単価", yen1(p.mono) + "/枚") + 
+        metric("カラー単価", yen1(p.color) + "/枚") + 
+        metric("月間インクコスト", yen(r.monthly)) + 
+        metric("年間インクコスト", yen(r.annual)) + 
+        metric(y + "年間の印刷インクコスト", yen(r.ink)) + 
+        metric("予備インク同時購入", yen(r.extraInk)) + 
+        metric("初期購入総額", yen(r.initial)) + 
+        metric("本体＋予備インク＋印刷コスト", yen(r.total)) + 
+        metric("平均インクコスト", yen1(r.avg) + "/枚") + 
+        metric("年間印刷枚数", ((m + c) * 12).toLocaleString() + "枚");
+    }
+
+    function machine(p, r, title) {
+      return `
+        <h2>${title}: ${p.name}</h2>
+        <span class="badge">${p.maker}</span> <span class="badge">${p.type}</span>
+        <p><b>対応インク：</b>${p.ink || "—"}</p>
+        <p><b>インク1セット印刷目安：</b>${p.yieldText || "調査中／公式セット枚数なし"}</p>
+        ${p.mono == null ? `<p class="note"><b>※A4モノクロ文書コストはメーカー公式値なし</b></p>` : ""}
+        <p>モノクロ ${yen1(p.mono)}/枚　カラー ${yen1(p.color)}/枚</p>
+        <div class="results">
+          ${metric("月間印刷コスト", yen(r.monthly))}
+          ${metric("年間印刷コスト", yen(r.annual))}
+          ${metric("本体価格", yen(r.price))}
+          ${metric("予備インク代", yen(r.extraInk))}
+          ${metric("初期購入総額", yen(r.initial))}
+          ${metric("使用期間総額", yen(r.total))}
+        </div>
+      `;
+    }
+
+    function compare() {
+      const a = get($("pa").value);
+      const b = get($("pb").value);
+      const m = +$("cmono").value || 0;
+      const c = +$("ccolor").value || 0;
+      const y = +$("cyears").value || 1;
+      const ra = calc(a, m, c, y, $("pAprice").value, $("pAink").value);
+      const rb = calc(b, m, c, y, $("pBprice").value, $("pBink").value);
+
+      $("resA").innerHTML = machine(a, ra, "A");
+      $("resB").innerHTML = machine(b, rb, "B");
+      $("resA").classList.toggle("winner", ra.total < rb.total);
+      $("resB").classList.toggle("winner", rb.total < ra.total);
+
+      const d = rb.total - ra.total;
+      $("diff").innerHTML = d === 0 ? "総額は同額です。" : d > 0 ? `機種Aの方が${y}年間で <b>${yen(d)}</b> 安い試算です。` : `機種Bの方が${y}年間で <b>${yen(-d)}</b> 安い試算です。`;
+      
+      draw(a, b, m, c, y, ra.initial, rb.initial);
+    }
+
+    function budget() {
+      const p = get($("bprinter").value);
+      const price = +$("bprice").value || p.price || 0;
+      const extra = +$("bextra").value || 0;
+      const cr = Math.max(0, Math.min(100, +$("bcolorRate").value || 0)) / 100;
+      const starter = +$("bstarter").value || 0;
+      const custom = +$("bcustom").value || 0;
+      const counts = [100, 500, 1000, 3000, 5000, custom].filter((v, i, a) => v > 0 && a.indexOf(v) === i).sort((a, b) => a - b);
+      const monoRate = 1 - cr;
+      const monoUnit = p.mono == null ? null : p.mono;
+      const colorUnit = p.color == null ? null : p.color;
+
+      $("budgetRows").innerHTML = counts.map(n => {
+        const mono = Math.round(n * monoRate);
+        const color = n - mono;
+        const billable = Math.max(0, n - starter);
+        const bm = Math.round(billable * monoRate);
+        const bc = billable - bm;
+        const ink = (monoUnit == null ? 0 : bm * monoUnit) + (colorUnit == null ? 0 : bc * colorUnit);
+        const initial = price + extra;
+        const total = initial + ink;
+        const per = n ? total / n : 0;
+        return `<tr><td><b>${n.toLocaleString()}枚</b></td><td>${mono.toLocaleString()}枚</td><td>${color.toLocaleString()}枚</td><td>${yen(ink)}</td><td>${yen(initial)}</td><td><b>${yen(total)}</b></td><td>${yen1(per)}/枚</td></tr>`;
+      }).join("");
+
+      $("budgetNote").innerHTML = `<b>${p.name}</b>｜対応インク：${p.ink || "—"}<br>インク1セット印刷目安：${p.yieldText || "公式セット枚数なし／機種マスター参照"}<br>${p.mono == null ? "⚠ モノクロ公式単価がないため、モノクロ分は追加インク相当額に含めていません。<br>" : ""}付属インク想定枚数までは追加インク相当額を0円として扱います。実際の消費量は原稿・クリーニング・使用環境で変動します。`;
+    }
+
+    function rankTotal(p, n, colorRate, starter, extra, price) {
+      const cr = colorRate / 100;
+      const billable = Math.max(0, n - starter);
+      const mono = Math.round(billable * (1 - cr));
+      const color = billable - mono;
+      if ((p.mono == null && mono > 0) || (p.color == null && color > 0)) return null;
+      return (Number(price) || p.price || 0) + (Number(extra) || 0) + mono * (p.mono || 0) + color * (p.color || 0);
+    }
+
+    function buildRankChoices() {
+      const defaults = new Set(["EP-817A", "PIXUS TS5530", "DCP-J529N", "DCP-J1270N", "DCP-J4250N"]);
+      $("rankChoices").innerHTML = printers.map((p, i) => `
+        <div style="border:1px solid var(--line);border-radius:10px;padding:10px">
+          <label style="display:flex;gap:8px;align-items:center">
+            <input class="rankCheck" data-i="${i}" type="checkbox" ${defaults.has(p.name) ? "checked" : ""}> <b>${p.maker}｜${p.name}</b>
+          </label>
+          <input class="input rankPrice" data-i="${i}" type="number" min="0" value="${p.price || 0}" placeholder="本体価格" style="margin-top:7px">
+        </div>
+      `).join("");
+    }
+
+    function ranking() {
+      const cr = Math.max(0, Math.min(100, +$("rColorRate").value || 0));
+      const starter = +$("rStarter").value || 0;
+      const extra = +$("rExtra").value || 0;
+      const counts = [500, 1000, 3000, 5000];
+
+      const selected = [...document.querySelectorAll(".rankCheck:checked")].map(ch => {
+        const i = +ch.dataset.i;
+        const p = printers[i];
+        const price = document.querySelector(`.rankPrice[data-i="${i}"]`).value;
+        return { p, vals: counts.map(n => rankTotal(p, n, cr, starter, extra, price)) };
+      });
+
+      const valid = selected.filter(x => x.vals[3] != null).sort((a, b) => a.vals[3] - b.vals[3]);
+      const best = valid.length ? valid[0].vals[3] : null;
+
+      $("rankRows").innerHTML = valid.map((x, i) => `
+        <tr ${i === 0 ? 'style="background:#eef9f2"' : ''}>
+          <td><b>${i + 1}位</b></td>
+          <td><b>${x.p.maker}｜${x.p.name}</b><br><small>${x.p.ink || ""}</small></td>
+          ${x.vals.map(v => `<td><b>${yen(v)}</b></td>`).join("")}
+          <td>${i === 0 ? '<b>最安</b>' : yen(x.vals[3] - best)}</td>
+        </tr>
+      `).join("");
+
+      const excluded = selected.filter(x => x.vals[3] == null).map(x => x.p.name);
+      $("rankNote").innerHTML = 
+        (valid.length ? `5,000枚時点では <b>${valid[0].p.name}</b> が最安の試算です。各枚数列を見れば、使用量による逆転も確認できます。` : "比較できる機種を選択してください。") + 
+        (excluded.length ? `<br>⚠ ${excluded.join("、")} は選択条件に必要な公式単価がないためランキングから除外しました。` : "");
+    }
+
+    function draw(a, b, m, c, y, aInitial, bInitial) {
+      const cv = $("chart");
+      const ctx = cv.getContext("2d");
+      const W = cv.width, H = cv.height, pad = 55;
+      
+      ctx.clearRect(0, 0, W, H);
+      const vals = [];
+      for (let i = 0; i <= y; i++) {
+        vals.push([
+          i, 
+          aInitial + (m * a.mono + c * a.color) * 12 * i, 
+          bInitial + (m * b.mono + c * b.color) * 12 * i
+        ]);
+      }
+      
+      const max = Math.max(...vals.flatMap(v => [v[1], v[2]]), 1) * 1.08;
+      
+      ctx.strokeStyle = "#ccd5dd";
+      ctx.fillStyle = "#66727e";
+      ctx.font = "12px sans-serif";
+      
+      for (let k = 0; k <= 4; k++) {
+        let yy = pad + (H - 2 * pad) * k / 4;
+        ctx.beginPath();
+        ctx.moveTo(pad, yy);
+        ctx.lineTo(W - pad, yy);
+        ctx.stroke();
+        ctx.fillText(yen(max * (1 - k / 4)), 3, yy + 4);
+      }
+      
+      const plot = (idx, color) => {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        vals.forEach((v, i) => {
+          let x = pad + (W - 2 * pad) * (i / Math.max(y, 1));
+          let yy = H - pad - (H - 2 * pad) * (v[idx] / max);
+          i ? ctx.lineTo(x, yy) : ctx.moveTo(x, yy);
+        });
+        ctx.stroke();
+      };
+      
+      plot(1, "#1769aa");
+      plot(2, "#16784a");
+      ctx.fillStyle = "#1769aa";
+      ctx.fillText("A " + a.name, pad, H - 15);
+      ctx.fillStyle = "#16784a";
+      ctx.fillText("B " + b.name, pad + 180, H - 15);
+    }
+
+    // 機種マスターテーブルの生成
+    printers.forEach(p => {
+      $("masterRows").insertAdjacentHTML("beforeend", `
+        <tr>
+          <td><b>${p.maker}</b></td>
+          <td><b>${p.name}</b></td>
+          <td>${p.ink || "—"}</td>
+          <td>${p.type}</td>
+          <td>${p.status}</td>
+          <td>${yen1(p.mono)}</td>
+          <td>${yen1(p.color)}</td>
+          <td>${p.yieldText || "調査中／公式セット枚数なし"}</td>
+          <td>${p.price ? yen(p.price) : "—"}</td>
+        </tr>
+      `);
+    });
+
+    buildRankChoices();
+
+    // イベントリスナーの登録
+    document.querySelectorAll("input, select").forEach(e => {
+      e.addEventListener("input", () => {
+        single();
+        compare();
+        budget();
+        ranking();
+      });
+    });
+
+    $("printer").addEventListener("change", () => {
+      $("price").value = get($("printer").value).price || "";
+      single();
+    });
+
+    $("pa").addEventListener("change", () => {
+      $("pAprice").value = get($("pa").value).price || "";
+      compare();
+    });
+
+    $("pb").addEventListener("change", () => {
+      $("pBprice").value = get($("pb").value).price || "";
+      compare();
+    });
+
+    $("bprinter").addEventListener("change", () => {
+      $("bprice").value = get($("bprinter").value).price || "";
+      budget();
+    });
+
+    document.querySelectorAll(".tab").forEach(t => {
+      t.onclick = () => {
+        document.querySelectorAll(".tab, .panel").forEach(x => x.classList.remove("active"));
+        t.classList.add("active");
+        $(t.dataset.tab).classList.add("active");
+        if (t.dataset.tab === "compare") compare();
+      };
+    });
+
+    // 初期化実行
+    single();
+    compare();
+    budget();
+    ranking();
+  </script>
+</body>
+</html>
